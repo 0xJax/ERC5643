@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/interfaces/IERC20.sol";
 import "./IERC5643.sol";
 
 error RenewalTooShort();
@@ -10,12 +11,15 @@ error RenewalTooLong();
 error InsufficientPayment();
 error SubscriptionNotRenewable();
 error InvalidTokenId();
+error UnsupportedTokenAddress();
 
 contract ERC5643 is ERC721, IERC5643 {
     mapping(uint256 => uint64) private _expirations;
+    mapping(address => uint256) private ERC20Price;
 
     uint64 private minimumRenewalDuration;
     uint64 private maximumRenewalDuration;
+
 
     constructor(string memory name_, string memory symbol_)
         ERC721(name_, symbol_)
@@ -42,6 +46,29 @@ contract ERC5643 is ERC721, IERC5643 {
             revert RenewalTooLong();
         }
 
+        if (msg.value < _getRenewalPrice(tokenId, duration)) {
+            revert InsufficientPayment();
+        }
+
+        _extendSubscription(tokenId, duration);
+    }
+
+    function renewSubscriptionERC20(uint256 tokenId, uint64 duration, address tokenAddress)
+        external
+        virtual
+    {
+        _validateRenewSubscription(tokenId, duration);
+
+        if (ERC20Price[tokenAddress] == 0) {
+            revert UnsupportedTokenAddress();
+        } else if (IERC20(tokenAddress).allowance(msg.sender, address(this)) < _getRenewalPrice(tokenId, duration)) {
+            revert InsufficientPayment();
+        }
+
+        _extendSubscription(tokenId, duration);
+    }
+
+    function _validateRenewSubscription(uint256 tokenId, uint64 duration) internal {
         if (msg.value < _getRenewalPrice(tokenId, duration)) {
             revert InsufficientPayment();
         }
