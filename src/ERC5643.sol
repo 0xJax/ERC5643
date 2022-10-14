@@ -15,7 +15,7 @@ error UnsupportedTokenAddress();
 
 contract ERC5643 is ERC721, IERC5643 {
     mapping(uint256 => uint64) private _expirations;
-    mapping(address => uint256) private ERC20Price;
+    mapping(address => uint256) public ERC20Price;
 
     uint64 private minimumRenewalDuration;
     uint64 private maximumRenewalDuration;
@@ -61,7 +61,8 @@ contract ERC5643 is ERC721, IERC5643 {
 
         if (ERC20Price[tokenAddress] == 0) {
             revert UnsupportedTokenAddress();
-        } else if (IERC20(tokenAddress).allowance(msg.sender, address(this)) < _getRenewalPrice(tokenId, duration)) {
+        }
+        if (!IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount)) {
             revert InsufficientPayment();
         }
 
